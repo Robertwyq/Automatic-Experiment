@@ -4,6 +4,7 @@ import keyboard
 import threading
 import socket
 import time
+from datetime import datetime
 
 STEP_PER_CRICLE = 360.0 / 1.8 * 10.0 * 16.0
 MM_PER_CRICLE = 3.1415926535898 * 36.0
@@ -14,7 +15,7 @@ INIT_Y = 0
 INIT_Z = 50
 
 global v
-v = 30
+v = 40
 
 CON_STR = {
     dType.DobotConnect.DobotConnect_NoError:  "DobotConnect_NoError",
@@ -30,7 +31,7 @@ def speedup(x):
     #如果想知道按键的值可以用hook绑定所有事件后，输出x.scan_code即可
     if x.event_type == 'down' and x.name == a.name:
         print("你按下了up键")
-        v = v + 25
+        v = v + 10
         vel = float(v) * STEP_PER_CRICLE / MM_PER_CRICLE * CONV_PARAM
         dType.SetEMotorEx(api, 0, 1, int(vel), 1)
 
@@ -41,7 +42,7 @@ def speeddown(x):
     #如果想知道按键的值可以用hook绑定所有事件后，输出x.scan_code即可
     if x.event_type == 'down' and x.name == a.name:
         print("你按下了down键")
-        v = v - 25
+        v = v - 10
         vel = float(v) * STEP_PER_CRICLE / MM_PER_CRICLE * CONV_PARAM
         dType.SetEMotorEx(api, 0, 1, int(vel), 1)
     #当监听的事件为down键，且是按下的时候
@@ -58,10 +59,8 @@ def catch(api):
 
     dType.SetEndEffectorParamsEx(api, 59.7, 0, 0, 1)
     dType.SetEndEffectorSuctionCupEx(api, 1, 1)
-    begin = time.time()
     dType.SetPTPCmdEx(api, 2, INIT_X, INIT_Y, INIT_Z-52, 0, 1)
-    end = time.time()
-    print(end-begin)
+
     # dType.SetWAITCmdEx(api, 1, 1)
     # turn on the sucker
 
@@ -94,11 +93,11 @@ def receive(TCPSocket):
     text = TCPSocket.recv(1024).decode()
     textlist = text.split()
     # data format: speed, global position, time
-    speed = float(textlist[0])
-    position_x = float(textlist[1])
-    position_y = float(textlist[2])
-    time = float(textlist[3])
-    return [speed,position_x,position_y,time]
+    time = float(textlist[0])
+    position_x = int(float(textlist[1]))
+    position_y = int(float(textlist[2]))
+    # time = float(textlist[2])
+    return [position_x,position_y,time]
 '''
 弧形抓取
 '''
@@ -108,8 +107,8 @@ def ArcCatch(api,v,x):
     dType.SetEndEffectorParamsEx(api, 59.7, 0, 0, 1)
     dType.SetEndEffectorSuctionCupEx(api, 1, 1)
 
-    dType.SetPTPCoordinateParams(api, v * ARM_PARAM, 20, 20, 50, 1)
-    cirPoint = [x, INIT_Y, INIT_Z - 52, 0]
+    dType.SetPTPCoordinateParams(api, v * ARM_PARAM, 100, 20, 50, 1)
+    cirPoint = [x, INIT_Y, INIT_Z - 55, 0]
     toPoint = [x, INIT_Y - 100, INIT_Z - 30, 0]
     dType.SetARCCmd(api, cirPoint, toPoint, 1)
     #结束圆弧轨迹，把物体放到某个区域
@@ -132,27 +131,34 @@ if __name__ == "__main__":
         dType.SetEMotorEx(api, 0, 1, int(vel), 1)
         keyboard.hook(speedup)
         keyboard.hook(speeddown)
+        # catch(api)
         # 通讯连接
-        LocalADDR = "192.168.61.1"
+        LocalADDR = "172.20.10.7"
         LocalPORT = 23333
         TCPSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPSocket.connect((LocalADDR, LocalPORT))
-        [v,x,y,t] = receive(TCPSocket)
+        [x,y,t] = receive(TCPSocket)
+        print("position: ",x,",",y,",",v)
+        print("t:",t)
         # 先快速移动到抓取的准备位置
         dType.SetPTPCoordinateParams(api, 50 * ARM_PARAM, 200, 20, 50, 1)
         dType.SetPTPCmdEx(api, 2, x, INIT_Y + 100, INIT_Z - 30, 0, 1)
+
         now = datetime.now()
         timeStamp = now.timestamp()
+        print("now: ",timeStamp)
         #总共移动到抓取准备位置的时间
         totaltime = (y - (INIT_Y+100))/v;
-        waittime = totaltime - (timeStamp - t)
+        print("totaltime:",totaltime)
+        waittime = totaltime - (timeStamp - t) - v/(100)
+        print("waittime: ",waittime)
         dType.SetWAITCmdEx(api, waittime, 1)
         # catch
         ArcCatch(api,v,x)
 
         keyboard.wait('esc')
         dType.SetEMotorEx(api, 0, 1, 0, 1)  #turn off the conveyor
-        TCPSocket.close()
+        # TCPSocket.close()
 
 
 
