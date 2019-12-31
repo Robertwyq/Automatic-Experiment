@@ -11,9 +11,11 @@ class Rectify:
         print('cy=',self.cy)
         print('w=',self.w)
         print('h=',self.h)
-    def Get_real_loc(self,parameters):
-        X_pixel = (parameters[1] - parameters[0])/image.shape[1]
-        Y_pixel = (parameters[3] - parameters[2])/image.shape[0]
+    def Get_real_loc(self,parameters,imgWidth,imgHeight):
+        # X_pixel = (parameters[1] - parameters[0])/image.shape[1]
+        # Y_pixel = (parameters[3] - parameters[2])/image.shape[0]
+        X_pixel = (parameters[1] - parameters[0])/imgWidth
+        Y_pixel = (parameters[3] - parameters[2])/imgHeight
         Real_X = X_pixel*self.cx+parameters[0]
         Real_Y = Y_pixel*self.cy+parameters[2]
         Real_W = X_pixel*self.w
