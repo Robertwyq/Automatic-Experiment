@@ -27,8 +27,6 @@ CON_STR = {
 def speedup(x):
     global v
     a = keyboard.KeyboardEvent('down', 28, 'up')
-    #按键事件a为按下enter键，第二个参数如果不知道每个按键的值就随便写，
-    #如果想知道按键的值可以用hook绑定所有事件后，输出x.scan_code即可
     if x.event_type == 'down' and x.name == a.name:
         print("你按下了up键")
         v = v + 10
@@ -38,8 +36,6 @@ def speedup(x):
 def speeddown(x):
     global v
     a = keyboard.KeyboardEvent('down', 28, 'down')
-    #按键事件a为按下enter键，第二个参数如果不知道每个按键的值就随便写，
-    #如果想知道按键的值可以用hook绑定所有事件后，输出x.scan_code即可
     if x.event_type == 'down' and x.name == a.name:
         print("你按下了down键")
         v = v - 10
@@ -51,24 +47,20 @@ def speeddown(x):
 """
 def catch(api):
     #catch: move down to catch the block using a sucker
+    # 设置机械臂速度
     v_arm = 50 * ARM_PARAM
-    # dType.SetWAITCmdEx(api, 1, 1)
     dType.SetPTPCoordinateParams(api, v_arm, 100, 20, 50, 1)
+    # 设置末端执行器，并打开吸盘
     dType.SetPTPCmdEx(api, 2, INIT_X, INIT_Y, INIT_Z , 0, 1)
-    # dType.SetWAITCmdEx(api, 8, 1)
-
     dType.SetEndEffectorParamsEx(api, 59.7, 0, 0, 1)
     dType.SetEndEffectorSuctionCupEx(api, 1, 1)
+    # 先向下移动抓取木块，然后移动到传送带外摆放
     dType.SetPTPCmdEx(api, 2, INIT_X, INIT_Y, INIT_Z-52, 0, 1)
-
-    # dType.SetWAITCmdEx(api, 1, 1)
-    # turn on the sucker
-
-    # dType.SetWAITCmdEx(api, 1, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X, INIT_Y, INIT_Z, 0, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X+100, INIT_Y, INIT_Z, 0, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X+100, INIT_Y, INIT_Z-100, 0, 1)
     dType.SetEndEffectorSuctionCupEx(api, 0, 1)
+    # 恢复原来的位置
     dType.SetPTPCmdEx(api, 2, INIT_X+100, INIT_Y, INIT_Z, 0, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X, INIT_Y, INIT_Z, 0, 1)
 '''
@@ -92,26 +84,25 @@ def move(api):
 def receive(TCPSocket):
     text = TCPSocket.recv(1024).decode()
     textlist = text.split()
-    # data format: speed, global position, time
+    # data format: time, x, y
     time = float(textlist[0])
     position_x = int(float(textlist[1]))
     position_y = int(float(textlist[2]))
-    # time = float(textlist[2])
     return [position_x,position_y,time]
 '''
 弧形抓取
 '''
 def ArcCatch(api,v,x):
-    # dType.SetWAITCmdEx(api, 20, 1) #对应21.5cm
-
+    # 打开吸盘
     dType.SetEndEffectorParamsEx(api, 59.7, 0, 0, 1)
     dType.SetEndEffectorSuctionCupEx(api, 1, 1)
-
+    # 设置机械臂速度
     dType.SetPTPCoordinateParams(api, v * ARM_PARAM, 100, 20, 50, 1)
+    # 圆弧轨迹
     cirPoint = [x, INIT_Y, INIT_Z - 55, 0]
     toPoint = [x, INIT_Y - 100, INIT_Z - 30, 0]
     dType.SetARCCmd(api, cirPoint, toPoint, 1)
-    #结束圆弧轨迹，把物体放到某个区域
+    # 结束圆弧轨迹，把物体放到某个区域
     dType.SetPTPCoordinateParams(api, 50 * ARM_PARAM, 200, 20, 50, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X + 100, INIT_Y - 100, INIT_Z - 30, 0, 1)
     dType.SetPTPCmdEx(api, 2, INIT_X + 100, INIT_Y - 100, INIT_Z - 100, 0, 1)
@@ -138,19 +129,14 @@ if __name__ == "__main__":
         TCPSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         TCPSocket.connect((LocalADDR, LocalPORT))
         [x,y,t] = receive(TCPSocket)
-        print("position: ",x,",",y,",",v)
-        print("t:",t)
         # 先快速移动到抓取的准备位置
         dType.SetPTPCoordinateParams(api, 50 * ARM_PARAM, 200, 20, 50, 1)
         dType.SetPTPCmdEx(api, 2, x, INIT_Y + 100, INIT_Z - 30, 0, 1)
-
         now = datetime.now()
         timeStamp = now.timestamp()
-        print("now: ",timeStamp)
         #总共移动到抓取准备位置的时间
         totaltime = (y - (INIT_Y+100))/v;
-        print("totaltime:",totaltime)
-        waittime = totaltime - (timeStamp - t) - v/(100)
+        waittime = totaltime - (timeStamp - t) - v/100
         print("waittime: ",waittime)
         dType.SetWAITCmdEx(api, waittime, 1)
         # catch
